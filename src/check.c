@@ -1618,6 +1618,37 @@ static int same_type(Ty a, Ty b)
            a.items == b.items;
 }
 
+/* Do two types say exactly the same thing? (Used to see when a loop has settled.) */
+static int type_equal(Ty a, Ty b)
+{
+    int i, k;
+    if (a.kind != b.kind || strcmp(a.cur, b.cur) != 0 || strcmp(a.base, b.base) != 0 || a.period != b.period ||
+        a.blueprint != b.blueprint || a.literal != b.literal || a.items != b.items || a.nmust != b.nmust)
+        return 0;
+    if (a.literal && (a.value.amount != b.value.amount || a.value.kind != b.value.kind)) return 0;
+    if ((a.elem == NULL) != (b.elem == NULL)) return 0;
+    if (a.elem != NULL && !same_item(*a.elem, *b.elem)) return 0;
+    for (i = 0; i < a.nmust; i++) {
+        for (k = 0; k < b.nmust; k++) if (same_item(a.must[i], b.must[k])) break;
+        if (k == b.nmust) return 0;
+    }
+    return 1;
+}
+
+static int env_equal(const Env *a, const Env *b)
+{
+    int i;
+    if (a->count != b->count) return 0;
+    for (i = 0; i < a->count; i++) {
+        Binding *other = env_find((Env *)b, a->items[i].name, a->items[i].len);
+        if (other == NULL || other->constant != a->items[i].constant || !type_equal(a->items[i].type, other->type))
+            return 0;
+    }
+    return 1;
+}
+
+#define MAX_ROUNDS 12
+
 /* Can the body leave a round early (so some later lines may not run)? */
 static int can_leave_early(const Node *n)
 {
@@ -1653,10 +1684,11 @@ static int replaces(const Node *n, const char *name, int len)
  */
 static void check_loop(Ctx *c, const Node *body, const Node *loop_var, const Ty *items, int nitems, int always)
 {
-    Env result, paths[16];
+    Env result, paths[16], start;
     int pass, i, k, npaths;
     always = always && !can_leave_early(body);
-    for (pass = 0; pass < 2; pass++) {
+    for (pass = 0; pass < MAX_ROUNDS; pass++) {    /* until another round changes nothing */
+        start = env_copy(c->names);
         npaths = 0;
         result = env_copy(c->names);                     /* zero times round */
         for (i = 0; i < (nitems > 0 ? nitems : 1); i++) {
@@ -1710,6 +1742,13 @@ static void check_loop(Ctx *c, const Node *body, const Node *loop_var, const Ty 
         for (k = 0; k < npaths; k++) env_free(&paths[k]);
         env_free(c->names);
         *c->names = result;
+        if (env_equal(&start, c->names)) { env_free(&start); return; }
+        if (pass == MAX_ROUNDS - 1)                      /* not settled: forget what still changes */
+            for (i = 0; i < c->names->count; i++) {
+                Binding *was = env_find(&start, c->names->items[i].name, c->names->items[i].len);
+                if (was == NULL || !type_equal(was->type, c->names->items[i].type)) c->names->items[i].type = unknown();
+            }
+        env_free(&start);
     }
 }
 

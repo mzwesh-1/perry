@@ -1,0 +1,14 @@
+# After three rounds c holds the plain number 5, so this comparison is fine.
+# Two passes over the loop are not enough to see that; the checker must keep
+# going until another round changes nothing.
+a = 1.00 ZAR
+b = 2.00 ZAR
+c = 3.00 ZAR
+n = 0
+keep_going_while_ n is_less_than_ 3:
+    c = b
+    b = a
+    a = 5
+    n = n + 1
+check_if_ c is_equal_to_ 5:
+    show_me_results("c is 5")
