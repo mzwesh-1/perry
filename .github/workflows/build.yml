@@ -1,0 +1,31 @@
+# Builds PERRY for Linux, Windows and macOS every time you push to GitHub.
+# The finished programs appear under Actions -> (the run) -> Artifacts.
+name: Build PERRY
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            out: PERRY-linux-x64
+            cmd: make static
+          - os: windows-latest
+            out: PERRY-win-x64.exe
+            cmd: gcc -std=c99 -Wall -Wextra -pedantic -O2 -static -o PERRY-win-x64.exe src/*.c
+          - os: macos-latest
+            out: PERRY-macos-arm64
+            cmd: make CC=clang && mv PERRY PERRY-macos-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        shell: bash
+        run: ${{ matrix.cmd }}
+      - name: Test
+        shell: bash
+        run: ./${{ matrix.out }} --version && ./${{ matrix.out }} examples/rounding.perry
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out }}
+          path: ${{ matrix.out }}

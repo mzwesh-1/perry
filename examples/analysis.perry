@@ -1,0 +1,26 @@
+"""
+Analysing a statement: averages, biggest and smallest, groups
+"""
+never_changes_ VAT = 15%
+
+statement = go_get_ "statement.csv" as_ ZAR
+spending  = go_get_in_ statement by_ amount that_is_less_than_ 0.00 ZAR
+
+show_me_results("Average spend:  ", average_of_ spending.amount)
+show_me_results("Biggest spend:  ", smallest_of_ spending.amount)
+show_me_results("Smallest spend: ", biggest_of_ spending.amount)
+show_me_results("First date:     ", smallest_of_ statement.date)
+
+show_me_results("")
+by_category = group_by_ spending by_ category
+sort_ by_category by_ amount lowest_first_
+show_me_results(by_category)
+
+# A forgotten coffee
+add_where_ statement [2026-09-30, "Coffee", "food", -35.00 ZAR]
+show_me_results("")
+show_me_results("Now", count_of_ statement, "transactions")
+
+# VAT
+show_me_results("VAT inside the rent:", vat_inside_ 8500.00 ZAR)
+show_me_results("VAT on a 1000.00 ZAR quote:", vat_on_ 1000.00 ZAR)

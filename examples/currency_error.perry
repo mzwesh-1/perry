@@ -1,0 +1,5 @@
+# Perry refuses to mix currencies
+price = 199.99 ZAR
+fee   = 5.00 USD
+total = price + fee
+show_me_results(total)

@@ -1,0 +1,11 @@
+"""
+Converting currencies at a recorded rate (example rate, not a live one)
+"""
+rate  = 18.2034 ZAR per USD
+price = 1000.00 ZAR
+
+usd = convert_ price to_ USD at_rate_ rate on_ 2026-09-25
+show_me_results(price, "is", usd)
+show_me_results("54.94 USD is", convert_ 54.94 USD to_ ZAR at_rate_ rate on_ 2026-09-25)
+
+because_is_ usd

@@ -1,0 +1,27 @@
+"""
+September bank statement (example data)
+"""
+statement = go_get_ "statement.csv" as_ ZAR
+show_me_results(statement)
+show_me_results("")
+
+remove_where_ statement by_ amount that_is_equal_to_ 0.00 ZAR
+spending = go_get_in_ statement by_ amount that_is_less_than_ 0.00 ZAR
+income   = go_get_in_ statement by_ amount that_is_greater_than_ 0.00 ZAR
+
+show_me_results("Transactions:", count_of_ statement)
+show_me_results("Money in: ", total_of_ income.amount)
+show_me_results("Money out:", -(total_of_ spending.amount))
+left = total_of_ statement.amount
+show_me_results("Left over:", left)
+
+show_me_results("")
+show_me_results("Biggest expenses:")
+sort_ spending by_ amount lowest_first_
+go_through_ spending as_ tx:
+    if_then_ tx.amount is_greater_than_ -1000.00 ZAR: stop_now_
+    show_me_results(" ", tx.date, tx.description, tx.amount)
+
+food = go_get_in_ statement by_ category that_is_equal_to_ "food"
+show_me_results("Food:", -(total_of_ food.amount))
+because_is_ left

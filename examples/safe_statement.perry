@@ -1,0 +1,27 @@
+"""
+Handling problems instead of crashing
+"""
+try_this_:
+    statement = go_get_ "statement.csv" as_ ZAR
+    show_me_results("Loaded", count_of_ statement, "transactions")
+    late = go_get_in_ statement by_ date that_is_greater_equal_to_ 2026-09-15
+    show_me_results("From the 15th:", total_of_ late.amount)
+even_if_ theres_a_file_error_:
+    show_me_results("Couldn't read the statement - check the file name")
+but_then_:
+    show_me_results("Statement check finished")
+
+# A currency mix-up is caught, not a crash
+try_this_:
+    total = 199.99 ZAR + 5.00 USD
+even_if_ theres_a_currency_error_:
+    show_me_results("Mixed currencies - convert first")
+
+# Your own alarms
+balance = 150.00 ZAR
+try_this_:
+    check_if_ balance is_less_than_ 500.00 ZAR:
+        raise_alarm_ "Balance below the 500.00 ZAR minimum"
+    show_me_results("Balance is fine")
+even_if_ theres_an_error_:
+    show_me_results("Warning: balance is low")

@@ -1,0 +1,18 @@
+"""
+budget_tools.perry - helpers other Perry files can steal_from_
+"""
+never_changes_ VAT = 15%
+
+blueprint_ Payment:
+    date:        date
+    description: text
+    category:    text
+    amount:      money
+
+define_ with_vat(amount):
+    give_back_ amount + VAT of amount
+
+define_ savings_goal(salary):
+    give_back_ 20% of salary
+
+share_ with_vat, savings_goal, VAT, Payment

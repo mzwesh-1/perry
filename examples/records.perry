@@ -1,0 +1,19 @@
+"""
+Records, modules and finding double charges
+"""
+steal_from_ budget_tools
+
+show_me_results("A 1000.00 ZAR quote with VAT:", with_vat(1000.00 ZAR))
+show_me_results("Savings goal on 25000.00 ZAR:", savings_goal(25000.00 ZAR))
+
+# A record made from the Payment blueprint in budget_tools.perry
+late = Payment(2026-09-30, "Netflix", "fun", -199.00 ZAR)
+show_me_results(late)
+show_me_results("It was for:", late.description, late.amount)
+
+# Add it to the statement, then look for anything charged twice
+statement = go_get_ "statement.csv" as_ ZAR
+add_where_ statement late
+show_me_results("")
+show_me_results("Possible double charges:")
+show_me_results(duplicate_where_ statement by_ description)

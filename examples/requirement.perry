@@ -1,0 +1,6 @@
+# not_unless_ stops the program when the books don't balance
+debits  = 8000.00 ZAR
+credits = 7999.99 ZAR
+show_me_results("Checking the books...")
+not_unless_ debits is_equal_to_ credits
+show_me_results("Books balance")

@@ -1,0 +1,62 @@
+steal_from_ holidays_za
+in_that_ money steal_from_ split
+
+"""
+September budget report
+written in Perry
+"""
+never_changes_ BUDGET = 15000.00 ZAR
+never_changes_ VAT = 15%
+
+blueprint_ Transaction:
+    date:     date
+    amount:   money
+    note:     text
+
+define_ late_fee(amount):
+    give_back_ amount * 2%
+
+statement = go_get_ "bank_september.csv"
+remove_where_ statement that_is_equal_to_ 0.00 ZAR
+
+spent = total_of_ statement
+big   = go_get_in_ statement that_is_greater_than_ 1000.00 ZAR
+sort_ big by_ amount highest_first_
+
+# Compare spending to the budget
+check_if_ spent is_greater_than_ BUDGET:
+    show_me_results("Over budget by", spent - BUDGET)
+thats_if_ spent is_similar_to_ BUDGET within_ 500.00 ZAR:
+    show_me_results("Right on the edge")
+since_then_:
+    show_me_results("Under budget")
+
+go_through_ big as_ tx:
+    if_then_ tx.amount is_greater_than_ 5000.00 ZAR: show_me_results(tx.note)
+
+# Loans
+loan    = 500000.00 ZAR
+rate    = 11.75% per year
+payment = monthly_payment(loan, rate per month)
+
+try_this_:
+    exactly_ 12 times:
+        loan = loan - payment
+    not_unless_ loan is_greater_than_ 0.00 ZAR
+    because_is_ payment
+even_if_ theres_a_currency_error_:
+    show_me_results("Can't mix currencies")
+even_if_ theres_an_error_:
+    raise_alarm_ "Something went wrong with the loan"
+but_then_:
+    show_me_results(loan)
+
+split 100.00 ZAR into 3
+due = 2026-12-31 + 1 business day
+paid = no_
+
+book_ "Paid rent":
+    debit_  rent_expense   8000.00 ZAR
+    credit_ bank           8000.00 ZAR
+
+save_to_ "september_report.csv"

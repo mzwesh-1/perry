@@ -1,0 +1,16 @@
+"""
+Interest: simple, compound, future and present value
+"""
+savings = 10000.00 ZAR
+rate    = 10% per year
+
+show_me_results("Simple interest, 5 years:  ", simple_interest_(savings, rate, 5 years))
+show_me_results("Compound interest, 5 years:", compound_interest_(savings, rate, 5 years))
+show_me_results("Worth after 5 years:       ", future_value_(savings, rate, 5 years))
+show_me_results("Compounded monthly:        ", future_value_(savings, rate per month, 60 months))
+
+# What must I put away today to have 50000.00 ZAR in 10 years?
+goal  = 50000.00 ZAR
+today = present_value_(goal, rate, 10 years)
+show_me_results("Needed today for", goal, "in 10 years:", today)
+because_is_ today

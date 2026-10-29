@@ -1,0 +1,39 @@
+"""
+Perry v0.3 - split, functions and because_is_
+"""
+never_changes_ VAT = 15%
+
+# ---- Functions --------------------------------------------------------
+define_ with_vat(amount):
+    give_back_ amount + VAT of amount
+
+define_ late_fee(amount, days_late):
+    check_if_ days_late is_greater_than_ 30:
+        give_back_ 10% of amount
+    give_back_ 2% of amount
+
+price = 4000.00 ZAR
+total = with_vat(price)
+show_me_results("Total with VAT:", total)
+show_me_results("Late fee (10 days):", late_fee(total, 10))
+show_me_results("Late fee (45 days):", late_fee(total, 45))
+
+# ---- Split without losing a cent --------------------------------------
+bill  = 100.00 ZAR
+parts = split bill into 3
+show_me_results("Split", bill, "3 ways:", parts)
+show_me_results("Back together:", total_of_ parts)
+not_unless_ total_of_ parts is_equal_to_ bill
+
+# ---- Lists --------------------------------------------------------------
+expenses = [1200.00 ZAR, 350.50 ZAR, 89.99 ZAR, 2400.00 ZAR]
+big = 0
+go_through_ expenses as_ cost:
+    if_then_ cost is_greater_than_ 1000.00 ZAR: big = big + 1
+show_me_results(big, "of", count_of_ expenses, "expenses are over 1000.00 ZAR")
+spent = total_of_ expenses
+
+# ---- because_is_ ------------------------------------------------------
+salary  = 25000.00 ZAR
+savings = 20% of (salary - spent)
+because_is_ savings

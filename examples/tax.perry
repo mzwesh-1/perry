@@ -1,0 +1,16 @@
+"""
+Progressive tax brackets.
+These brackets are MADE UP for the example - use your country's real table.
+"""
+tax_table_ income_tax:
+    up_to_ 100000.00 ZAR  taxed_at_ 10%
+    up_to_ 300000.00 ZAR  taxed_at_ 20%
+    above_                taxed_at_ 40%
+
+salaries = [80000.00 ZAR, 250000.00 ZAR, 500000.00 ZAR]
+go_through_ salaries as_ salary:
+    owed = income_tax on_ salary
+    show_me_results(salary, "pays", owed, "tax")
+
+owed = income_tax on_ 500000.00 ZAR
+because_is_ owed

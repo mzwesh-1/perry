@@ -1,0 +1,12 @@
+"""
+Rounding rules
+"""
+price = 4600.50 ZAR
+show_me_results("normal:        ", round_to_ price 0 decimals)
+show_me_results("the bank way:  ", round_to_ price 0 decimals the_bank_way_)
+show_me_results("up:            ", round_to_ price 0 decimals up_)
+show_me_results("down:          ", round_to_ price 0 decimals down_)
+
+# The bank way sends halves to the even neighbour, so over many
+# amounts the rounding doesn't drift upwards:
+show_me_results(round_to_ 2.5 0 decimals the_bank_way_, round_to_ 3.5 0 decimals the_bank_way_)

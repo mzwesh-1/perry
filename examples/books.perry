@@ -1,0 +1,32 @@
+"""
+Double-entry bookkeeping: every entry must balance
+"""
+book_ "Owner invests":
+    debit_  bank           50000.00 ZAR
+    credit_ capital        50000.00 ZAR
+
+book_ "Paid rent":
+    debit_  rent_expense    8000.00 ZAR
+    credit_ bank            8000.00 ZAR
+
+book_ "Sold goods, part on credit":
+    debit_  bank           12000.00 ZAR
+    debit_  debtors         3000.00 ZAR
+    credit_ sales          15000.00 ZAR
+
+show_me_results("Bank balance:", balance_of_("bank"))
+show_me_results("")
+show_me_results(trial_balance_())
+
+# A typo that doesn't balance is refused - nothing gets recorded
+try_this_:
+    book_ "Paid electricity":
+        debit_  electricity     890.00 ZAR
+        credit_ bank            980.00 ZAR
+even_if_ theres_a_balance_error_:
+    show_me_results("")
+    show_me_results("Refused: that entry doesn't balance")
+
+save_to_ "journal.csv" journal_()
+save_to_ "trial_balance.csv" trial_balance_()
+show_me_results("Saved journal.csv and trial_balance.csv")

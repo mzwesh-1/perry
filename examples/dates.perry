@@ -1,0 +1,21 @@
+"""
+Dates and business days (with South African public holidays)
+"""
+steal_from_ holidays_za
+
+invoice_date = 2026-12-18
+due          = invoice_date + 5 business days
+show_me_results("Invoice sent:", invoice_date)
+show_me_results("Payment due: ", due)
+show_me_results("Calendar days to pay:", days_between_ invoice_date and_ due)
+
+# Monthly debit order on the last day of each month
+debit = 2026-01-31
+exactly_ 4 times:
+    show_me_results("Debit order:", end_of_month_ debit)
+    debit = debit + 1 month
+
+# Working days in September 2026 (Heritage Day is on the 24th)
+show_me_results("Working days in September:", business_days_between_ 2026-08-31 and_ 2026-09-30)
+
+because_is_ due

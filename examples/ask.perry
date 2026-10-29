@@ -1,0 +1,11 @@
+"""
+Asking questions while the program runs.
+Run this in a terminal (VS Code does that for you when you press F5).
+Type amounts any way you like: 25000, R25 000 or 25000.00
+"""
+salary = ask_user_("Your monthly salary?") as_ ZAR
+rent   = ask_user_("Your rent?") as_ ZAR
+left   = salary - rent
+show_me_results("You have", left, "left after rent")
+check_if_ left is_less_than_ 30% of salary:
+    show_me_results("Rent takes a big part of your salary")

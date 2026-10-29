@@ -1,0 +1,19 @@
+"""
+Home loan: monthly payment and repayment schedule
+"""
+loan   = 500000.00 ZAR
+rate   = 11.75% per year
+months = 240
+
+payment = monthly_payment(loan, rate per month, months)
+show_me_results("Monthly payment:", payment)
+
+plan = schedule_of_(loan, rate per month, months)
+show_me_results("Total interest over", months, "months:", total_of_ plan.interest)
+show_me_results("Total paid:", total_of_ plan.payment)
+
+# The first year of the schedule
+first_year = go_get_in_ plan by_ month that_is_less_equal_to_ 12
+show_me_results(first_year)
+
+because_is_ payment

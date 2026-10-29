@@ -1,0 +1,8 @@
+entry,description,account,debit,credit
+1,Owner invests,bank,50000.00,
+1,Owner invests,capital,,50000.00
+2,Paid rent,rent_expense,8000.00,
+2,Paid rent,bank,,8000.00
+3,"Sold goods, part on credit",bank,12000.00,
+3,"Sold goods, part on credit",debtors,3000.00,
+3,"Sold goods, part on credit",sales,,15000.00

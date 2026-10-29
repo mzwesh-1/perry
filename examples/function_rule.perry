@@ -1,0 +1,8 @@
+# A function can read names from outside, but it can't change them.
+# It has to hand back a result with give_back_ instead.
+total = 0.00 ZAR
+
+define_ add_fee(amount):
+    total = total + amount
+
+add_fee(50.00 ZAR)
