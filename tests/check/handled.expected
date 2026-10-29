@@ -1,0 +1,4 @@
+handled.perry:3: note: can't add ZAR and USD - convert one currency first
+        (caught by even_if_ here, so it won't stop the program)
+     3 | total = 199.99 ZAR + 5.00 USD
+handled.perry: no mistakes found

@@ -4,8 +4,8 @@
 CC     = gcc
 CFLAGS = -std=c99 -Wall -Wextra -pedantic -O2
 
-SRC = src/main.c src/lexer.c src/parser.c src/interp.c src/value.c src/errors.c src/csv.c src/dates.c src/finance.c
-HDR = src/tokens.h src/lexer.h src/ast.h src/parser.h src/interp.h src/value.h src/errors.h src/csv.h src/dates.h src/finance.h
+SRC = src/main.c src/lexer.c src/parser.c src/interp.c src/value.c src/errors.c src/csv.c src/dates.c src/finance.c src/check.c
+HDR = src/tokens.h src/lexer.h src/ast.h src/parser.h src/interp.h src/value.h src/errors.h src/csv.h src/dates.h src/finance.h src/check.h
 
 PERRY: $(SRC) $(HDR)
 	$(CC) $(CFLAGS) -o PERRY $(SRC)
@@ -17,6 +17,7 @@ static: $(SRC) $(HDR)
 
 test: PERRY
 	./PERRY test.perry
+	sh tests/check/run.sh
 
 # Install PERRY so it can be run from anywhere (and found by VS Code):
 #   sudo make install

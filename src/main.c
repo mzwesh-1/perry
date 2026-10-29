@@ -12,6 +12,7 @@
 #include "parser.h"
 #include "interp.h"
 #include "errors.h"
+#include "check.h"
 
 #define PERRY_VERSION "0.9.0"
 
@@ -108,7 +109,14 @@ int main(int argc, char **argv)
     } else {
         Node *program = parse_program(source);
         if (strcmp(mode, "tree") == 0)       ast_print(program, 0);
-        else if (strcmp(mode, "check") == 0) printf("%s: no mistakes found\n", path);
+        else if (strcmp(mode, "check") == 0) {
+            int errors = check_program(program);
+            if (errors > 0) {
+                free(source);
+                return EXIT_PARSE_ERROR;
+            }
+            printf("%s: no mistakes found\n", path);
+        }
         else                                 interpret(program);
     }
 

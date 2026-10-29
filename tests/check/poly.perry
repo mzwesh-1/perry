@@ -1,0 +1,5 @@
+define_ with_vat(amount):
+    give_back_ amount + 15% of amount
+show_me_results(with_vat(100.00 ZAR))
+show_me_results(with_vat(5.00 USD))
+show_me_results(with_vat(100.00 ZAR) + with_vat(5.00 USD))

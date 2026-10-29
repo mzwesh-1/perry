@@ -1,0 +1,3 @@
+expenses = [1200.00 USD, 350.50 ZAR, 89.99 ZAR]
+show_me_results(count_of_ expenses)
+show_me_results("Total:", total_of_ expenses)

@@ -1,0 +1,2 @@
+project = [-100000.00 ZAR, 30000.00 ZAR, 35000.00 USD, 40000.00 ZAR]
+show_me_results("NPV:", npv_(10% per year, project))

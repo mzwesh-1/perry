@@ -1,0 +1,2 @@
+table_currency.perry:3: error: can't compare ZAR and USD - convert one currency first
+     3 | check_if_ tx.amount is_less_than_ -2000.00 USD:

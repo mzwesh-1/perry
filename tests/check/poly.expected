@@ -1,0 +1,2 @@
+poly.perry:5: error: can't add ZAR and USD - convert one currency first
+     5 | show_me_results(with_vat(100.00 ZAR) + with_vat(5.00 USD))

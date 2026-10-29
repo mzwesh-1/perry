@@ -1,0 +1,9 @@
+# Correct code must pass: functions used with two currencies, a rate turned monthly.
+define_ with_vat(amount):
+    give_back_ amount + 15% of amount
+show_me_results(with_vat(100.00 ZAR), with_vat(5.00 USD))
+loan = 500000.00 ZAR
+rate = 11.75% per year
+show_me_results(monthly_payment(loan, rate per month, 20 years))
+usd = convert_ 1000.00 ZAR to_ USD at_rate_ 18.2034 ZAR per USD
+show_me_results(usd)

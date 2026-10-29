@@ -1,0 +1,2 @@
+records.perry:7: error: can't add USD and ZAR - convert one currency first
+     7 | show_me_results("Invoiced:", total_of_ invoices.amount)

@@ -1,0 +1,7 @@
+blueprint_ Invoice:
+    number: number
+    client: text
+    amount: money
+
+invoices = [Invoice(101, "Sipho", 1500.00 USD), Invoice(102, "Lerato", 2750.50 ZAR)]
+show_me_results("Invoiced:", total_of_ invoices.amount)

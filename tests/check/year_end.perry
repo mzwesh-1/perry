@@ -1,0 +1,6 @@
+define_ year_end(balance, is_december):
+    check_if_ is_december:
+        give_back_ balance + 250.00 USD
+    give_back_ balance
+
+show_me_results(year_end(10000.00 ZAR, no_))

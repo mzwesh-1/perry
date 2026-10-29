@@ -1,0 +1,5 @@
+# A mistake that a try_this_ handler catches is a note, not an error.
+try_this_:
+    total = 199.99 ZAR + 5.00 USD
+even_if_ theres_a_currency_error_:
+    show_me_results("Mixed currencies - convert first")

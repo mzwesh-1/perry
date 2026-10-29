@@ -1,0 +1,6 @@
+loan = 500000.00 ZAR
+rate = 11.75% per year
+check_if_ count_of_ [1, 2] is_greater_than_ 5:
+    payment = monthly_payment(loan, rate, 20 years)
+    show_me_results(payment)
+show_me_results("done")

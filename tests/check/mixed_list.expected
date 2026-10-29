@@ -1,0 +1,2 @@
+mixed_list.perry:3: error: can't add USD and ZAR - convert one currency first
+     3 | show_me_results("Total:", total_of_ expenses)

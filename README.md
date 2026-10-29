@@ -22,6 +22,29 @@ Other modes:
     ./PERRY --check test.perry     # look for mistakes without running
     ./PERRY --version
 
+### Checking without running
+
+`./PERRY --check file.perry` finds money mistakes before the program runs, on every
+path - including `check_if_` branches and functions that a test run never reaches.
+It reports the same errors Perry would stop with: mixed currencies, money plus a
+plain number, a yearly rate where a monthly one is needed, part-year compounding,
+an exchange rate for the wrong currencies, a record field of the wrong type, mixed
+currencies in a list or a table loaded `as_ ZAR`, and names that don't exist yet.
+
+    define_ year_end(balance, is_december):
+        check_if_ is_december:
+            give_back_ balance + 250.00 USD
+        give_back_ balance
+
+    show_me_results(year_end(10000.00 ZAR, no_))
+
+Running this prints 10000.00 ZAR. `--check` reports line 3: can't add ZAR and USD.
+
+It only reports what it is sure of: values from CSV files, `ask_user_` and modules
+are checked when the program runs. A mistake inside `try_this_` that an `even_if_`
+would catch is shown as a note. VS Code runs `--check` on every save, so these show
+as red underlines. `make test` runs the checker's tests in `tests/check/`.
+
 `make static` builds `PERRY-linux-x64`, a copy that runs on any 64-bit Linux or WSL
 with nothing else installed. This is the one packed inside the VS Code extension.
 

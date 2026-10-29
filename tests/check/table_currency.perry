@@ -1,0 +1,4 @@
+statement = go_get_ "statement.csv" as_ ZAR
+go_through_ statement as_ tx:
+    check_if_ tx.amount is_less_than_ -2000.00 USD:
+        show_me_results("Big payment:", tx.description)

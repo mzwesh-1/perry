@@ -1,0 +1,2 @@
+cash_flows.perry:2: error: all the cash flows must be the same kind - item 3 is USD, item 1 is ZAR
+     2 | show_me_results("NPV:", npv_(10% per year, project))
