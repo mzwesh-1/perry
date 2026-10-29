@@ -1,6 +1,6 @@
-mod/uses_tools.perry:3: error: in mod/tools.perry line 3: can't mix a percent and a plain number with + or - (did you mean: 15% of amount?)
+mod/uses_tools.perry:3: error: in tools.perry line 3: can't mix a percent and a plain number with + or - (did you mean: 15% of amount?)
      3 | show_me_results(with_vat(100.00))
-mod/uses_tools.perry:6: error: in mod/tools.perry line 5: can't add ZAR and USD - convert one currency first
+mod/uses_tools.perry:6: error: in tools.perry line 5: can't add ZAR and USD - convert one currency first
      6 | show_me_results(in_dollars(5.00 ZAR))
 mod/uses_tools.perry:7: error: tools doesn't share 'nothing_here' - add 'share_ nothing_here' to tools.perry
      7 | in_that_ tools steal_from_ nothing_here

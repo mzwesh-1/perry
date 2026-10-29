@@ -345,6 +345,13 @@ static int          checked_count, checked_capacity;
 static int          has_imports;     /* a module couldn't be read: names may be missing */
 static int          call_depth;
 
+/* budget_tools.perry, without the folders in front */
+static const char *file_part(const char *path)
+{
+    const char *slash = strrchr(path, '/');
+    return slash ? slash + 1 : path;
+}
+
 static void *grow(void *p, int *capacity, size_t size)
 {
     *capacity = *capacity ? *capacity * 2 : 16;
@@ -1228,7 +1235,7 @@ static Ty check_body(const FnEntry *entry, const Ty *args, int line)
 
     if (entry->home != &main_module) {            /* report it where this file calls it */
         if (other_file == NULL) reached_at = line;
-        other_file = entry->home->path;
+        other_file = file_part(entry->home->path);
     }
     call_depth++;
     check_stmt(&inner, fn->b);
@@ -1789,7 +1796,7 @@ static Module *load_module(Ctx *c, const Node *n)
     top.returned     = unknown();
     top.has_returned = 0;
     if (other_file == NULL) reached_at = n->line;
-    other_file = m->path;
+    other_file = file_part(m->path);
     m->loading = 1;
     check_stmt(&top, m->program);
     m->loading = 0;
