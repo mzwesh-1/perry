@@ -1,0 +1,6 @@
+never_changes_ VAT = 15%
+define_ with_vat(amount):
+    give_back_ amount + VAT of amount
+define_ in_dollars(amount):
+    give_back_ amount + 1.00 USD
+share_ with_vat, in_dollars, VAT

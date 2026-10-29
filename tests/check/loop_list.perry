@@ -1,0 +1,6 @@
+# Every item of base goes into flows, so flows surely holds ZAR and USD.
+base = [2300000.00 ZAR, 3000000.00 USD]
+flows = [-12000000.00 ZAR]
+go_through_ base as_ amount:
+    add_where_ flows amount
+show_me_results(npv_(14% per year, flows))

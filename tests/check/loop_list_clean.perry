@@ -1,0 +1,18 @@
+# Correct code must pass: only ZAR amounts are added (chosen by position); a
+# list rebuilt each round; a loop that stops before the USD amount.
+mixed = [100.00 ZAR, 5.00 USD, 250.00 ZAR]
+zar = [0.00 ZAR]
+i = 0
+go_through_ mixed as_ m:
+    i = i + 1
+    check_if_ i is_not_equal_to_ 2:
+        add_where_ zar m
+show_me_results(total_of_ zar)
+go_through_ mixed as_ m:
+    latest = [m]
+    show_me_results(total_of_ latest)
+picked = [1.00 ZAR]
+go_through_ [2.00 ZAR, 3.00 USD] as_ p:
+    if_then_ count_of_ picked is_equal_to_ 2: stop_now_
+    add_where_ picked p
+show_me_results(total_of_ picked)

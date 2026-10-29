@@ -1,0 +1,2 @@
+loop_list.perry:6: error: all the cash flows must be the same kind - some items are USD, item 1 is ZAR
+     6 | show_me_results(npv_(14% per year, flows))

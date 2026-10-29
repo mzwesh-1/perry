@@ -5,7 +5,7 @@
 cd "$(dirname "$0")" || exit 1
 perry=../../PERRY
 failed=0
-for f in *.perry; do
+for f in *.perry mod/uses_tools.perry; do
     out=$($perry --check "$f" 2>&1)
     if [ "$1" = "--update" ]; then
         printf '%s\n' "$out" > "${f%.perry}.expected"

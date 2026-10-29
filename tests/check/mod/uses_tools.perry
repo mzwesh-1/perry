@@ -1,0 +1,7 @@
+steal_from_ tools
+show_me_results(with_vat(100.00 ZAR))
+show_me_results(with_vat(100.00))
+show_me_results(in_dollars(5.00 USD))
+check_if_ VAT is_greater_than_ 20%:
+    show_me_results(in_dollars(5.00 ZAR))
+in_that_ tools steal_from_ nothing_here

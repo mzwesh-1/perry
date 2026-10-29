@@ -22,6 +22,7 @@
 #include "check.h"
 #include "errors.h"
 #include "finance.h"
+#include "parser.h"
 
 /* ------------------------------------------------------------------ */
 /* Types                                                              */
@@ -43,6 +44,8 @@ struct Ty {
     Ty         *elem;               /* LIST: the type of its items        */
     Ty         *items;              /* LIST written out: each item; ROW: each field */
     int         nitems;
+    Ty         *must;               /* LIST: kinds of item it surely holds, oldest first */
+    int         nmust;
 };
 
 /*
@@ -95,6 +98,27 @@ static int is_numeric(Ty t)         { return t.kind == VAL_NUMBER || t.kind == V
 static int same_cur(const char *a, const char *b) { return a[0] && b[0] && strcmp(a, b) == 0; }
 static int diff_cur(const char *a, const char *b) { return a[0] && b[0] && strcmp(a, b) != 0; }
 
+static int same_item(Ty a, Ty b)
+{
+    return a.kind == b.kind && strcmp(a.cur, b.cur) == 0 && a.period == b.period;
+}
+
+/* A list that surely holds 'it' as well (only known kinds are worth keeping). */
+static void must_add(Ty *list, Ty it)
+{
+    int i;
+    Ty *more;
+    if (!known(it) || it.kind == VAL_NOTHING) return;
+    for (i = 0; i < list->nmust; i++) if (same_item(list->must[i], it)) return;
+    more = (Ty *)calloc((size_t)list->nmust + 1, sizeof(Ty));
+    if (more == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+    if (list->nmust > 0) memcpy(more, list->must, sizeof(Ty) * (size_t)list->nmust);
+    it.literal = 0;
+    it.items = NULL; it.nitems = 0; it.must = NULL; it.nmust = 0;
+    more[list->nmust++] = it;
+    list->must = more;
+}
+
 /* Two types meet where branches join: keep what both agree on. */
 static Ty merge(Ty a, Ty b)
 {
@@ -107,6 +131,14 @@ static Ty merge(Ty a, Ty b)
     if (a.blueprint == b.blueprint) t.blueprint = a.blueprint;
     if (a.kind == VAL_LIST && a.elem && b.elem) t.elem = boxed(merge(*a.elem, *b.elem));
     if (a.items == b.items) { t.items = a.items; t.nitems = a.nitems; }
+    if (a.kind == VAL_LIST && a.nmust > 0 && b.nmust > 0) {
+        int i, k;
+        t.must = (Ty *)calloc((size_t)a.nmust, sizeof(Ty));
+        if (t.must == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+        for (i = 0; i < a.nmust; i++)
+            for (k = 0; k < b.nmust; k++)
+                if (same_item(a.must[i], b.must[k])) { t.must[t.nmust++] = a.must[i]; break; }
+    }
     if (a.literal && b.literal && a.value.kind == b.value.kind && a.value.amount == b.value.amount &&
         a.value.period == b.value.period && a.value.divisor == b.value.divisor) {
         t.literal = 1;
@@ -132,6 +164,15 @@ static Mistake *mistakes;
 static int      mistake_count, mistake_capacity;
 static int      catch_all, catch_currency;   /* try_this_ handlers around us */
 
+/*
+ * While a module's code is being checked, 'other_file' is its file name and
+ * 'reached_at' the line of this file that led there (the steal_from_ or the
+ * call). Mistakes are reported on that line, so an editor underlines the
+ * right place in the file that is open.
+ */
+static const char *other_file;
+static int         reached_at;
+
 static void report(MistakeKind kind, int line, const char *fmt, ...)
 {
     Mistake m;
@@ -145,6 +186,12 @@ static void report(MistakeKind kind, int line, const char *fmt, ...)
     va_start(args, fmt);
     vsnprintf(m.text, sizeof m.text, fmt, args);
     va_end(args);
+    if (other_file != NULL) {
+        char inner[300];
+        memcpy(inner, m.text, sizeof inner);
+        snprintf(m.text, sizeof m.text, "in %s line %d: %.240s", other_file, line, inner);
+        m.line = reached_at;
+    }
 
     for (i = 0; i < mistake_count; i++)          /* functions are checked once per call */
         if (mistakes[i].line == line && strcmp(mistakes[i].text, m.text) == 0) {
@@ -255,30 +302,87 @@ static Env env_join(const Env *a, const Env *b)
 /* The program as a whole                                             */
 /* ------------------------------------------------------------------ */
 
+typedef struct Module Module;
+
 typedef struct {
-    Env  *names;                     /* where assignments go               */
-    Env  *globals;                   /* a function's outside names, or NULL */
-    int   in_function;
-    Ty    returned;                  /* give_back_ types seen so far      */
-    int   has_returned;
+    const Node *fn;
+    Module     *home;                /* the file it was written in          */
+} FnEntry;
+
+/* A .perry file: this program, or one it takes names from with steal_from_. */
+struct Module {
+    char         name[64];
+    char        *path;
+    const Node  *program;
+    Env          globals;
+    FnEntry     *fns;
+    int          nfns, fns_capacity;
+    int          used_share;
+    const Node **shared;
+    int          nshared;
+    int          loading;
+};
+
+typedef struct {
+    Env    *names;                   /* where assignments go               */
+    Env    *globals;                 /* a function's outside names, or NULL */
+    Module *module;                  /* whose functions are in use         */
+    int     in_function;
+    Ty      returned;                /* give_back_ types seen so far      */
+    int     has_returned;
 } Ctx;
 
-static const Node **functions;
-static int         *function_checked;
-static int          function_count;
-static const Node **blueprints;
-static int          blueprint_count;
-static int          has_imports;     /* names may arrive from other files */
-static int          call_depth;
-
+#define MAX_MODULES     32
 #define MAX_CHECK_DEPTH 4
 
-static const Node *find_function(const char *name, int len)
+static Module       main_module;
+static Module      *modules[MAX_MODULES];
+static int          module_count;
+static const Node **blueprints;
+static int          blueprint_count, blueprint_capacity;
+static const Node **checked_fns;     /* functions checked at least once    */
+static int          checked_count, checked_capacity;
+static int          has_imports;     /* a module couldn't be read: names may be missing */
+static int          call_depth;
+
+static void *grow(void *p, int *capacity, size_t size)
+{
+    *capacity = *capacity ? *capacity * 2 : 16;
+    p = realloc(p, size * (size_t)*capacity);
+    if (p == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+    return p;
+}
+
+static FnEntry *find_function_in(Module *m, const char *name, int len)
 {
     int i;
-    for (i = 0; i < function_count; i++)
-        if (functions[i]->name_len == len && memcmp(functions[i]->name, name, (size_t)len) == 0) return functions[i];
+    for (i = 0; i < m->nfns; i++)
+        if (m->fns[i].fn->name_len == len && memcmp(m->fns[i].fn->name, name, (size_t)len) == 0) return &m->fns[i];
     return NULL;
+}
+
+static void add_function(Module *m, const Node *fn, Module *home)
+{
+    if (m->nfns == m->fns_capacity) m->fns = (FnEntry *)grow(m->fns, &m->fns_capacity, sizeof(FnEntry));
+    m->fns[m->nfns].fn   = fn;
+    m->fns[m->nfns].home = home;
+    m->nfns++;
+}
+
+static void add_blueprint(const Node *bp)
+{
+    int i;
+    for (i = 0; i < blueprint_count; i++) if (blueprints[i] == bp) return;
+    if (blueprint_count == blueprint_capacity)
+        blueprints = (const Node **)grow((void *)blueprints, &blueprint_capacity, sizeof(Node *));
+    blueprints[blueprint_count++] = bp;
+}
+
+static int was_checked(const Node *fn)
+{
+    int i;
+    for (i = 0; i < checked_count; i++) if (checked_fns[i] == fn) return 1;
+    return 0;
 }
 
 static const Node *find_blueprint(const char *name, int len)
@@ -287,6 +391,12 @@ static const Node *find_blueprint(const char *name, int len)
     for (i = 0; i < blueprint_count; i++)
         if (blueprints[i]->name_len == len && memcmp(blueprints[i]->name, name, (size_t)len) == 0) return blueprints[i];
     return NULL;
+}
+
+static const Node *find_function(Ctx *c, const char *name, int len)
+{
+    FnEntry *e = find_function_in(c->module, name, len);
+    return e != NULL ? e->fn : NULL;
 }
 
 static Binding *lookup(Ctx *c, const char *name, int len)
@@ -721,6 +831,18 @@ static Ty add_up(Ty list, int line)
     int i, have = 0, before = mistake_count;
     if (list.items == NULL) {
         Ty e = element_of(list);
+        for (i = 1; i < list.nmust; i++) {
+            Ty first = list.must[0], it = list.must[i];
+            if (first.kind == VAL_MONEY && it.kind == VAL_MONEY && diff_cur(first.cur, it.cur)) {
+                fail_currency(line, "can't add %s and %s - convert one currency first", first.cur, it.cur);
+                return unknown();
+            }
+            if ((first.kind == VAL_MONEY) != (it.kind == VAL_MONEY) && is_numeric(first) && is_numeric(it)) {
+                Ty plain = first.kind == VAL_MONEY ? it : first;
+                fail_currency(line, "can't add money and %s", value_kind_name((ValueKind)plain.kind));
+                return unknown();
+            }
+        }
         return e.kind == VAL_MONEY ? money_in(e.cur) : e.kind == VAL_NUMBER ? of_kind(VAL_NUMBER) : unknown();
     }
     for (i = 0; i < list.nitems; i++) {
@@ -797,7 +919,18 @@ static Ty cash_flows(Ty list, int line, const char *fname)
              fname, value_kind_name((ValueKind)list.kind));
         return unknown();
     }
-    if (list.items == NULL) return element_of(list);
+    if (list.items == NULL) {                    /* built up bit by bit: what it surely holds */
+        for (i = 1; i < list.nmust; i++) {
+            Ty first = list.must[0], it = list.must[i];
+            if ((first.kind == VAL_MONEY || first.kind == VAL_NUMBER) && (it.kind == VAL_MONEY || it.kind == VAL_NUMBER) &&
+                (first.kind != it.kind || diff_cur(first.cur, it.cur))) {
+                fail(line, "all the cash flows must be the same kind - some items are %s, item 1 is %s",
+                     flow_kind(&it), flow_kind(&first));
+                return unknown();
+            }
+        }
+        return element_of(list);
+    }
     for (i = 0; i < list.nitems; i++) {
         Ty it = list.items[i];
         if (!known(it)) { if (!found) return unknown(); continue; }
@@ -821,7 +954,15 @@ static void stat_values(Ty list, int line, const char *fname)
 {
     Ty example = unknown();
     int i, found = 0;
-    if (list.items == NULL) return;
+    if (list.items == NULL) {
+        for (i = 1; i < list.nmust; i++)
+            if (is_numeric(list.must[0]) && is_numeric(list.must[i]) &&
+                (list.must[0].kind != list.must[i].kind || diff_cur(list.must[0].cur, list.must[i].cur))) {
+                fail(line, "%s: all the values must be the same kind (some items are different)", fname);
+                return;
+            }
+        return;
+    }
     for (i = 0; i < list.nitems; i++) {
         Ty it = list.items[i];
         if (!known(it)) { if (!found) return; continue; }
@@ -1068,32 +1209,46 @@ static int has_give_back(const Node *n)
 
 /* Checks a function's body with these inputs. Each call is checked on its own,
    so with_vat(100.00 ZAR) and with_vat(5.00 USD) are both fine. */
-static Ty check_body(Ctx *c, const Node *fn, const Ty *args)
+static Ty check_body(const FnEntry *entry, const Ty *args, int line)
 {
+    const Node *fn = entry->fn;
     Env locals = { NULL, 0, 0 };
     Ctx inner;
-    int i;
+    const char *saved_file = other_file;
+    int saved_line = reached_at, i;
 
     inner.names        = &locals;
-    inner.globals      = c->in_function ? c->globals : c->names;
+    inner.globals      = &entry->home->globals;
+    inner.module       = entry->home;
     inner.in_function  = 1;
     inner.returned     = unknown();
     inner.has_returned = 0;
     for (i = 0; i < fn->count; i++)
         env_put(&locals, fn->items[i]->name, fn->items[i]->name_len, args ? args[i] : unknown(), 0);
 
+    if (entry->home != &main_module) {            /* report it where this file calls it */
+        if (other_file == NULL) reached_at = line;
+        other_file = entry->home->path;
+    }
     call_depth++;
     check_stmt(&inner, fn->b);
     call_depth--;
-    for (i = 0; i < function_count; i++)
-        if (functions[i] == fn) function_checked[i] = 1;
+    other_file = saved_file;
+    reached_at = saved_line;
+
+    if (!was_checked(fn)) {
+        if (checked_count == checked_capacity)
+            checked_fns = (const Node **)grow((void *)checked_fns, &checked_capacity, sizeof(Node *));
+        checked_fns[checked_count++] = fn;
+    }
     env_free(&locals);
     return inner.has_returned ? inner.returned : unknown();
 }
 
 static Ty check_call(Ctx *c, const Node *n, int want_value)
 {
-    const Node *fn = find_function(n->name, n->name_len), *bp;
+    FnEntry *entry = find_function_in(c->module, n->name, n->name_len);
+    const Node *fn = entry ? entry->fn : NULL, *bp;
     Ty args[8], result;
     int i, kind, k;
 
@@ -1158,7 +1313,7 @@ static Ty check_call(Ctx *c, const Node *n, int want_value)
         Ty *values = (Ty *)malloc(sizeof(Ty) * (size_t)(n->count + 1));
         if (values == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
         for (i = 0; i < n->count; i++) values[i] = check_expr(c, n->items[i]);
-        result = call_depth < MAX_CHECK_DEPTH ? check_body(c, fn, values) : unknown();
+        result = call_depth < MAX_CHECK_DEPTH ? check_body(entry, values, n->line) : unknown();
         free(values);
     }
     return result;
@@ -1196,7 +1351,7 @@ static Ty check_expr(Ctx *c, const Node *n)
     case N_VAR:
         var = lookup(c, n->name, n->name_len);
         if (var == NULL) {
-            if (!has_imports && find_function(n->name, n->name_len) == NULL)
+            if (!has_imports && find_function(c, n->name, n->name_len) == NULL)
                 fail(n->line, "'%.*s' doesn't have a value yet - give it one first, like: %.*s = 0",
                      n->name_len, n->name, n->name_len, n->name);
             return unknown();
@@ -1255,6 +1410,7 @@ static Ty check_expr(Ctx *c, const Node *n)
             t.items[i] = check_expr(c, n->items[i]);
             t.elem = boxed(i == 0 ? t.items[i] : merge(*t.elem, t.items[i]));
             t.elem->literal = 0;
+            must_add(&t, t.items[i]);
         }
         return t;
 
@@ -1449,25 +1605,55 @@ static void join_into(Ctx *c, Env *a, Env *b)
     *c->names = joined;
 }
 
-/* A loop body may run zero, one or many times. */
 static int same_type(Ty a, Ty b)
 {
     return a.kind == b.kind && strcmp(a.cur, b.cur) == 0 && a.period == b.period && a.blueprint == b.blueprint &&
            a.items == b.items;
 }
 
+/* Can the body leave a round early (so some later lines may not run)? */
+static int can_leave_early(const Node *n)
+{
+    int i;
+    if (n == NULL) return 0;
+    if (n->kind == N_STOP || n->kind == N_SKIP || n->kind == N_RETURN || n->kind == N_TRY) return 1;
+    if (can_leave_early(n->a) || can_leave_early(n->b) || can_leave_early(n->c)) return 1;
+    for (i = 0; i < n->count; i++) if (can_leave_early(n->items[i])) return 1;
+    return 0;
+}
+
+/* Does the body give this name a new value, or take items out of it? */
+static int replaces(const Node *n, const char *name, int len)
+{
+    int i;
+    if (n == NULL) return 0;
+    if ((n->kind == N_ASSIGN || n->kind == N_CONSTANT || n->kind == N_FOR || n->kind == N_ERASE) &&
+        n->name_len == len && memcmp(n->name, name, (size_t)len) == 0) return 1;
+    if (n->kind == N_REMOVE && n->a->name_len == len && memcmp(n->a->name, name, (size_t)len) == 0) return 1;
+    if (replaces(n->a, name, len) || replaces(n->b, name, len) || replaces(n->c, name, len)) return 1;
+    for (i = 0; i < n->count; i++) if (replaces(n->items[i], name, len)) return 1;
+    return 0;
+}
+
 /*
  * A loop body may run zero, one or many times. With go_through_ over a list
  * written out item by item, the body is checked once for each kind of item,
  * as if each item came round in turn.
+ *
+ * 'always' means every path surely runs: go_through_ a list of known items,
+ * or exactly_ 3 times, with no way to leave a round early. Then whatever the
+ * body surely adds to a list (add_where_) is surely in the list afterwards.
  */
-static void check_loop(Ctx *c, const Node *body, const Node *loop_var, const Ty *items, int nitems)
+static void check_loop(Ctx *c, const Node *body, const Node *loop_var, const Ty *items, int nitems, int always)
 {
-    Env result, path;
-    int pass, i, k;
+    Env result, paths[16];
+    int pass, i, k, npaths;
+    always = always && !can_leave_early(body);
     for (pass = 0; pass < 2; pass++) {
+        npaths = 0;
         result = env_copy(c->names);                     /* zero times round */
         for (i = 0; i < (nitems > 0 ? nitems : 1); i++) {
+            Env path;
             for (k = 0; k < i; k++) if (same_type(items[k], items[i])) break;
             if (k < i) continue;
             if (loop_var != NULL) {
@@ -1482,31 +1668,202 @@ static void check_loop(Ctx *c, const Node *body, const Node *loop_var, const Ty 
             } else {
                 path = check_branch(c, body);
             }
-            {
+            if (always && npaths == 0) {                 /* never zero times round */
+                env_free(&result);
+                result = env_copy(&path);
+            } else {
                 Env joined = env_join(&result, &path);
                 env_free(&result);
                 result = joined;
             }
-            env_free(&path);
+            if (npaths < 16) paths[npaths++] = path;
+            else             env_free(&path);
         }
+        if (always) {                                    /* how many rounds isn't known: positions aren't */
+            for (i = 0; i < result.count; i++) {
+                Binding *b = &result.items[i], *was = env_find(c->names, b->name, b->len);
+                if (b->type.kind == VAL_LIST && (was == NULL || was->type.items != b->type.items)) {
+                    b->type.items = NULL;
+                    b->type.nitems = 0;
+                }
+            }
+        }
+        if (always && npaths < 16) {
+            for (i = 0; i < result.count; i++) {
+                Binding *b = &result.items[i];
+                if (b->type.kind != VAL_LIST || replaces(body, b->name, b->len)) continue;
+                for (k = 0; k < npaths; k++) {
+                    Binding *p = env_find(&paths[k], b->name, b->len);
+                    int m;
+                    if (p == NULL || p->type.kind != VAL_LIST) continue;
+                    for (m = 0; m < p->type.nmust; m++) must_add(&b->type, p->type.must[m]);
+                }
+            }
+        }
+        for (k = 0; k < npaths; k++) env_free(&paths[k]);
         env_free(c->names);
         *c->names = result;
     }
 }
 
-/* steal_from_ budget_tools needs budget_tools.perry next to the program */
-static void check_module_file(const Node *n)
+static void collect_definitions(Module *m, const Node *program)
 {
-    char path[1024];
-    const char *slash = strrchr(g_file_name, '/');
-    size_t dir = slash ? (size_t)(slash - g_file_name + 1) : 0;
-    FILE *f;
-    if (name_is(n->name, n->name_len, "holidays_za") || n->name_len > 200 || dir > 700) return;
-    memcpy(path, g_file_name, dir);
-    snprintf(path + dir, sizeof path - dir, "%.*s.perry", n->name_len, n->name);
-    f = fopen(path, "rb");
-    if (f != NULL) { fclose(f); return; }
-    fail(n->line, "can't find the module file '%.*s.perry'", n->name_len, n->name);
+    int i;
+    for (i = 0; i < program->count; i++) {
+        const Node *n = program->items[i];
+        if (n->kind == N_FUNCTION && find_function_in(m, n->name, n->name_len) == NULL) add_function(m, n, m);
+        if (n->kind == N_BLUEPRINT) add_blueprint(n);
+    }
+}
+
+static char *read_file(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    char *text;
+    long size;
+    size_t got;
+    if (f == NULL) return NULL;
+    fseek(f, 0L, SEEK_END);
+    size = ftell(f);
+    rewind(f);
+    text = (char *)malloc((size_t)size + 1);
+    if (text == NULL) { fclose(f); return NULL; }
+    got = fread(text, 1, (size_t)size, f);
+    text[got] = '\0';
+    fclose(f);
+    return text;
+}
+
+/* steal_from_ budget_tools: budget_tools.perry next to this file, checked once with its own names */
+static Module *load_module(Ctx *c, const Node *n)
+{
+    Module *m, *from = c->module;
+    const char *slash = strrchr(from->path, '/');
+    const char *saved_name = g_file_name, *saved_source = g_source, *saved_file = other_file;
+    int saved_line = reached_at, i;
+    char *source;
+    Ctx top;
+
+    for (i = 0; i < module_count; i++)
+        if (name_is(n->name, n->name_len, modules[i]->name)) {
+            if (modules[i]->loading) {
+                fail(n->line, "'%.*s' is already being loaded - two modules can't steal_from_ each other",
+                     n->name_len, n->name);
+                return NULL;
+            }
+            return modules[i];
+        }
+    if (name_is(n->name, n->name_len, from->name)) {
+        fail(n->line, "a file can't steal_from_ itself");
+        return NULL;
+    }
+    if (module_count >= MAX_MODULES || n->name_len > 60) return NULL;
+
+    m = (Module *)calloc(1, sizeof(Module));
+    if (m == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+    snprintf(m->name, sizeof m->name, "%.*s", n->name_len, n->name);
+    m->path = (char *)malloc(strlen(from->path) + (size_t)n->name_len + 16);
+    if (m->path == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+    if (slash) sprintf(m->path, "%.*s/%.*s.perry", (int)(slash - from->path), from->path, n->name_len, n->name);
+    else       sprintf(m->path, "%.*s.perry", n->name_len, n->name);
+    source = read_file(m->path);
+    if (source == NULL) {
+        fail(n->line, "can't find the module file '%s'", m->path);
+        free(m->path);
+        free(m);
+        return NULL;
+    }
+    modules[module_count++] = m;
+
+    g_file_name = m->path;                  /* a parse error points at the module's own file */
+    g_source    = source;
+    m->program  = parse_program(source);
+    g_file_name = saved_name;
+    g_source    = saved_source;
+
+    collect_definitions(m, m->program);
+    top.names        = &m->globals;
+    top.globals      = NULL;
+    top.module       = m;
+    top.in_function  = 0;
+    top.returned     = unknown();
+    top.has_returned = 0;
+    if (other_file == NULL) reached_at = n->line;
+    other_file = m->path;
+    m->loading = 1;
+    check_stmt(&top, m->program);
+    m->loading = 0;
+    other_file = saved_file;
+    reached_at = saved_line;
+    return m;
+}
+
+static int is_shared(Module *m, const char *name, int len)
+{
+    int i;
+    if (!m->used_share) return 1;            /* no share_ at all: everything is shared */
+    for (i = 0; i < m->nshared; i++)
+        if (m->shared[i]->name_len == len && memcmp(m->shared[i]->name, name, (size_t)len) == 0) return 1;
+    return 0;
+}
+
+/* Brings one name from a module into this file; taken values never change. */
+static void take_name(Ctx *c, Module *m, const char *name, int len, int line)
+{
+    FnEntry *fe = find_function_in(m, name, len), *existing;
+    Binding *v = env_find(&m->globals, name, len);
+
+    if (fe != NULL) {
+        existing = find_function_in(c->module, name, len);
+        if (existing != NULL && existing->fn != fe->fn)
+            fail(line, "there's already a function called '%.*s' here", len, name);
+        if (existing == NULL) add_function(c->module, fe->fn, fe->home);
+        return;
+    }
+    if (v != NULL) {
+        Ty t = v->type;
+        env_put(&c->module->globals, name, len, t, 1);
+        return;
+    }
+    if (find_blueprint(name, len) != NULL) return;
+    fail(line, "%s has no function or value called '%.*s'", m->name, len, name);
+}
+
+static void import_module(Ctx *c, const Node *n)
+{
+    Module *m;
+    int i;
+
+    if (name_is(n->name, n->name_len, "holidays_za")) {
+        if (n->count > 0) fail(n->line, "holidays_za is built in - just write: steal_from_ holidays_za");
+        return;
+    }
+    m = load_module(c, n);
+    if (m == NULL) {
+        has_imports = 1;                     /* its names can't be known */
+        return;
+    }
+    if (n->count > 0) {                      /* in_that_ m steal_from_ a, b */
+        for (i = 0; i < n->count; i++) {
+            const Node *want = n->items[i];
+            if (!is_shared(m, want->name, want->name_len)) {
+                fail(want->line, "%s doesn't share '%.*s' - add 'share_ %.*s' to %s.perry",
+                     m->name, want->name_len, want->name, want->name_len, want->name, m->name);
+                continue;
+            }
+            take_name(c, m, want->name, want->name_len, want->line);
+        }
+        return;
+    }
+    if (m->used_share) {
+        for (i = 0; i < m->nshared; i++)
+            take_name(c, m, m->shared[i]->name, m->shared[i]->name_len, n->line);
+    } else {
+        for (i = 0; i < m->nfns; i++)
+            if (m->fns[i].home == m) take_name(c, m, m->fns[i].fn->name, m->fns[i].fn->name_len, n->line);
+        for (i = 0; i < m->globals.count; i++)
+            take_name(c, m, m->globals.items[i].name, m->globals.items[i].len, n->line);
+    }
 }
 
 static void check_stmt(Ctx *c, const Node *n)
@@ -1547,12 +1904,12 @@ static void check_stmt(Ctx *c, const Node *n)
         t = check_expr(c, n->a);
         if (known(t) && t.kind != VAL_NUMBER)
             fail(n->line, "exactly_ needs a whole number of times, like: exactly_ 12 times:");
-        check_loop(c, n->b, NULL, NULL, 0);
+        check_loop(c, n->b, NULL, NULL, 0, t.literal && t.value.amount >= PERRY_SCALE);
         return;
 
     case N_WHILE:
         condition(check_expr(c, n->a), n->line, "keep_going_while_");
-        check_loop(c, n->b, NULL, NULL, 0);
+        check_loop(c, n->b, NULL, NULL, 0, 0);
         return;
 
     case N_FOR:
@@ -1560,14 +1917,14 @@ static void check_stmt(Ctx *c, const Node *n)
         if (known(t) && t.kind != VAL_LIST && t.kind != VAL_TABLE)
             fail(n->line, "go_through_ needs a list (got %s)", value_kind_name((ValueKind)t.kind));
         if (t.kind == VAL_LIST && t.items != NULL) {
-            check_loop(c, n->b, n, t.items, t.nitems);
+            check_loop(c, n->b, n, t.items, t.nitems, t.nitems > 0);
         } else {
             Ty item = element_of(t);
             if (t.kind == VAL_TABLE) {                   /* a row: its money is in the table's currency */
                 item = of_kind(VAL_ROW);
                 memcpy(item.cur, t.cur, 4);
             }
-            check_loop(c, n->b, n, &item, 1);
+            check_loop(c, n->b, n, &item, 1, 0);
         }
         return;
 
@@ -1638,6 +1995,9 @@ static void check_stmt(Ctx *c, const Node *n)
                 if (list.nitems > 0) memcpy(grown.items, list.items, sizeof(Ty) * (size_t)list.nitems);
                 grown.items[list.nitems] = item;
             }
+            grown.must = list.must;
+            grown.nmust = list.nmust;
+            must_add(&grown, item);
             if (env_find(c->names, n->a->name, n->a->name_len) != NULL) store(c, n->a, grown, 0);
         }
         return;
@@ -1652,10 +2012,24 @@ static void check_stmt(Ctx *c, const Node *n)
         return;
 
     case N_IMPORT:
-        check_module_file(n);
+        import_module(c, n);
         return;
 
     case N_SHARE:
+        c->module->used_share = 1;
+        for (i = 0; i < n->count; i++) {
+            const Node *name = n->items[i];
+            if (find_function_in(c->module, name->name, name->name_len) == NULL &&
+                lookup(c, name->name, name->name_len) == NULL && find_blueprint(name->name, name->name_len) == NULL)
+                fail(name->line, "can't share '%.*s' - nothing with that name exists yet (put share_ after it)",
+                     name->name_len, name->name);
+            c->module->shared = (const Node **)realloc((void *)c->module->shared,
+                                                       sizeof(Node *) * (size_t)(c->module->nshared + 1));
+            if (c->module->shared == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+            c->module->shared[c->module->nshared++] = name;
+        }
+        return;
+
     case N_BLUEPRINT:
     case N_FUNCTION:
     case N_STOP:
@@ -1721,24 +2095,6 @@ static void check_stmt(Ctx *c, const Node *n)
 /* Entry point                                                        */
 /* ------------------------------------------------------------------ */
 
-static void collect_definitions(const Node *program)
-{
-    int i;
-    functions        = (const Node **)calloc((size_t)program->count + 1, sizeof(Node *));
-    function_checked = (int *)calloc((size_t)program->count + 1, sizeof(int));
-    blueprints       = (const Node **)calloc((size_t)program->count + 1, sizeof(Node *));
-    if (functions == NULL || function_checked == NULL || blueprints == NULL) {
-        fprintf(stderr, "PERRY: out of memory\n");
-        exit(1);
-    }
-    for (i = 0; i < program->count; i++) {
-        const Node *n = program->items[i];
-        if (n->kind == N_FUNCTION)  functions[function_count++] = n;
-        if (n->kind == N_BLUEPRINT) blueprints[blueprint_count++] = n;
-        if (n->kind == N_IMPORT)    has_imports = 1;
-    }
-}
-
 static int by_line(const void *x, const void *y)
 {
     const Mistake *a = (const Mistake *)x, *b = (const Mistake *)y;
@@ -1763,21 +2119,27 @@ static void print_source_line(int line)
 
 int check_program(const Node *program)
 {
-    Env globals = { NULL, 0, 0 };
     Ctx c;
     int i, errors = 0;
 
-    collect_definitions(program);
-    c.names        = &globals;
+    snprintf(main_module.name, sizeof main_module.name, "main");
+    main_module.path    = (char *)g_file_name;
+    main_module.program = program;
+    collect_definitions(&main_module, program);
+    c.names        = &main_module.globals;
     c.globals      = NULL;
+    c.module       = &main_module;
     c.in_function  = 0;
     c.returned     = unknown();
     c.has_returned = 0;
+    main_module.loading = 1;
     check_stmt(&c, program);
+    main_module.loading = 0;
 
-    /* functions nobody calls are still checked, with inputs of any type */
-    for (i = 0; i < function_count; i++)
-        if (!function_checked[i]) check_body(&c, functions[i], NULL);
+    /* this file's functions nobody calls are still checked, with inputs of any type */
+    for (i = 0; i < main_module.nfns; i++)
+        if (main_module.fns[i].home == &main_module && !was_checked(main_module.fns[i].fn))
+            check_body(&main_module.fns[i], NULL, main_module.fns[i].fn->line);
 
     if (mistake_count > 1) qsort(mistakes, (size_t)mistake_count, sizeof(Mistake), by_line);
     for (i = 0; i < mistake_count; i++) {
@@ -1788,6 +2150,5 @@ int check_program(const Node *program)
         print_source_line(mistakes[i].line);
         if (!mistakes[i].note) errors++;
     }
-    env_free(&globals);
     return errors;
 }
