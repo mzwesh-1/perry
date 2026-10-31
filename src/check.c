@@ -220,17 +220,51 @@ typedef struct {
     int         constant;
 } Binding;
 
+/*
+ * The names known at one point of the program. A small hash table ('slots',
+ * each holding an index into 'items' plus one, 0 = empty) keeps look-ups fast
+ * in programs with thousands of names.
+ */
 typedef struct {
     Binding *items;
     int      count, capacity;
+    int     *slots;
+    int      nslots;
 } Env;
+
+static unsigned name_hash(const char *name, int len)
+{
+    unsigned h = 2166136261u;
+    int i;
+    for (i = 0; i < len; i++) h = (h ^ (unsigned char)name[i]) * 16777619u;
+    return h;
+}
+
+static void env_reindex(Env *e)
+{
+    int i;
+    free(e->slots);
+    e->nslots = 16;
+    while (e->nslots < e->capacity * 2) e->nslots *= 2;
+    e->slots = (int *)calloc((size_t)e->nslots, sizeof(int));
+    if (e->slots == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+    for (i = 0; i < e->count; i++) {
+        unsigned h = name_hash(e->items[i].name, e->items[i].len) & (unsigned)(e->nslots - 1);
+        while (e->slots[h]) h = (h + 1) & (unsigned)(e->nslots - 1);
+        e->slots[h] = i + 1;
+    }
+}
 
 static Binding *env_find(Env *e, const char *name, int len)
 {
-    int i;
-    if (e == NULL) return NULL;
-    for (i = 0; i < e->count; i++)
-        if (e->items[i].len == len && memcmp(e->items[i].name, name, (size_t)len) == 0) return &e->items[i];
+    unsigned h;
+    if (e == NULL || e->count == 0) return NULL;
+    h = name_hash(name, len) & (unsigned)(e->nslots - 1);
+    while (e->slots[h]) {
+        Binding *b = &e->items[e->slots[h] - 1];
+        if (b->len == len && memcmp(b->name, name, (size_t)len) == 0) return b;
+        h = (h + 1) & (unsigned)(e->nslots - 1);
+    }
     return NULL;
 }
 
@@ -238,14 +272,19 @@ static void env_put(Env *e, const char *name, int len, Ty t, int constant)
 {
     Binding *b = env_find(e, name, len);
     if (b == NULL) {
+        unsigned h;
         if (e->count == e->capacity) {
             e->capacity = e->capacity ? e->capacity * 2 : 16;
             e->items = (Binding *)realloc(e->items, sizeof(Binding) * (size_t)e->capacity);
             if (e->items == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
         }
+        if (e->nslots < e->capacity * 2) env_reindex(e);
         b = &e->items[e->count++];
         b->name = name;
         b->len  = len;
+        h = name_hash(name, len) & (unsigned)(e->nslots - 1);
+        while (e->slots[h]) h = (h + 1) & (unsigned)(e->nslots - 1);
+        e->slots[h] = e->count;
     }
     b->type     = t;
     b->constant = constant;
@@ -254,7 +293,9 @@ static void env_put(Env *e, const char *name, int len, Ty t, int constant)
 static void env_remove(Env *e, const char *name, int len)
 {
     Binding *b = env_find(e, name, len);
-    if (b != NULL) *b = e->items[--e->count];
+    if (b == NULL) return;
+    *b = e->items[--e->count];
+    env_reindex(e);
 }
 
 static Env env_copy(const Env *e)
@@ -262,10 +303,20 @@ static Env env_copy(const Env *e)
     Env c;
     c.count = c.capacity = e->count;
     c.items = NULL;
+    c.slots = NULL;
+    c.nslots = 0;
     if (e->count > 0) {
         c.items = (Binding *)malloc(sizeof(Binding) * (size_t)e->count);
         if (c.items == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
         memcpy(c.items, e->items, sizeof(Binding) * (size_t)e->count);
+        if (e->nslots >= c.capacity * 2) {         /* same names, same places: copy the table */
+            c.nslots = e->nslots;
+            c.slots = (int *)malloc(sizeof(int) * (size_t)c.nslots);
+            if (c.slots == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+            memcpy(c.slots, e->slots, sizeof(int) * (size_t)c.nslots);
+        } else {
+            env_reindex(&c);
+        }
     }
     return c;
 }
@@ -273,8 +324,10 @@ static Env env_copy(const Env *e)
 static void env_free(Env *e)
 {
     free(e->items);
+    free(e->slots);
     e->items = NULL;
-    e->count = e->capacity = 0;
+    e->slots = NULL;
+    e->count = e->capacity = e->nslots = 0;
 }
 
 /* After two paths join: a name set on only one path may or may not exist. */
@@ -1219,7 +1272,7 @@ static int has_give_back(const Node *n)
 static Ty check_body(const FnEntry *entry, const Ty *args, int line)
 {
     const Node *fn = entry->fn;
-    Env locals = { NULL, 0, 0 };
+    Env locals = { NULL, 0, 0, NULL, 0 };
     Ctx inner;
     const char *saved_file = other_file;
     int saved_line = reached_at, i;
@@ -1344,7 +1397,52 @@ static Ty literal(const Node *n)
     return t;
 }
 
+/*
+ * PERRY_CHECK_STATS=1 prints how many expressions got a known type: the
+ * share of the program the checker can see into with no annotations at all.
+ * An expression counts as known if any check of it (any call, any round) knew it.
+ */
+typedef struct { const Node *node; int known; } Seen;
+static Seen *seen;
+static int   seen_capacity, seen_count, stats_on = -1;
+
+static void count_expr(const Node *n, Ty t)
+{
+    size_t h;
+    if (stats_on < 0) stats_on = getenv("PERRY_CHECK_STATS") != NULL;
+    if (!stats_on || n == NULL || other_file != NULL) return;
+    if (seen_count * 2 >= seen_capacity) {           /* grow and rehash */
+        Seen *old = seen;
+        int old_capacity = seen_capacity, i;
+        seen_capacity = seen_capacity ? seen_capacity * 2 : 1024;
+        seen = (Seen *)calloc((size_t)seen_capacity, sizeof(Seen));
+        if (seen == NULL) { fprintf(stderr, "PERRY: out of memory\n"); exit(1); }
+        seen_count = 0;
+        for (i = 0; i < old_capacity; i++)
+            if (old[i].node != NULL) {
+                h = ((size_t)old[i].node >> 4) % (size_t)seen_capacity;
+                while (seen[h].node != NULL) h = (h + 1) % (size_t)seen_capacity;
+                seen[h] = old[i];
+                seen_count++;
+            }
+        free(old);
+    }
+    h = ((size_t)n >> 4) % (size_t)seen_capacity;
+    while (seen[h].node != NULL && seen[h].node != n) h = (h + 1) % (size_t)seen_capacity;
+    if (seen[h].node == NULL) { seen[h].node = n; seen_count++; }
+    if (known(t) || (t.kind == T_UNKNOWN && t.cur[0])) seen[h].known = 1;
+}
+
+static Ty check_expr_inner(Ctx *c, const Node *n);
+
 static Ty check_expr(Ctx *c, const Node *n)
+{
+    Ty t = check_expr_inner(c, n);
+    count_expr(n, t);
+    return t;
+}
+
+static Ty check_expr_inner(Ctx *c, const Node *n)
 {
     Ty a, b, t;
     Binding *var;
@@ -2187,6 +2285,11 @@ int check_program(const Node *program)
         if (main_module.fns[i].home == &main_module && !was_checked(main_module.fns[i].fn))
             check_body(&main_module.fns[i], NULL, main_module.fns[i].fn->line);
 
+    if (stats_on > 0) {
+        int known_count = 0;
+        for (i = 0; i < seen_capacity; i++) if (seen[i].node != NULL && seen[i].known) known_count++;
+        fprintf(stderr, "%s: stats: %d expressions, %d with a known type\n", g_file_name, seen_count, known_count);
+    }
     if (mistake_count > 1) qsort(mistakes, (size_t)mistake_count, sizeof(Mistake), by_line);
     for (i = 0; i < mistake_count; i++) {
         fprintf(stderr, "%s:%d: %s: %s\n", g_file_name, mistakes[i].line,
