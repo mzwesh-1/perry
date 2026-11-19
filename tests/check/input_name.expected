@@ -1,0 +1,2 @@
+input_name.perry:6: error: 'left' belongs outside this function, so the function can't change it - use give_back_ to hand back a result instead
+     6 | define_ verdict(left):

@@ -1283,8 +1283,15 @@ static Ty check_body(const FnEntry *entry, const Ty *args, int line)
     inner.in_function  = 1;
     inner.returned     = unknown();
     inner.has_returned = 0;
-    for (i = 0; i < fn->count; i++)
+    for (i = 0; i < fn->count; i++) {
+        /* interp.c stores each input like an assignment: an input named like an
+           outside name fails when called, as if the function changed that name */
+        if (args != NULL && env_find(inner.globals, fn->items[i]->name, fn->items[i]->name_len) != NULL)
+            fail(fn->line, "'%.*s' belongs outside this function, so the function can't change it "
+                           "- use give_back_ to hand back a result instead",
+                 fn->items[i]->name_len, fn->items[i]->name);
         env_put(&locals, fn->items[i]->name, fn->items[i]->name_len, args ? args[i] : unknown(), 0);
+    }
 
     if (entry->home != &main_module) {            /* report it where this file calls it */
         if (other_file == NULL) reached_at = line;
