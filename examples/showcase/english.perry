@@ -1,0 +1,18 @@
+# Perry reads like English
+salary = 25000.00 ZAR
+rent   = 7800.00 ZAR
+never_changes_ VAT = 15%
+
+check_if_ rent is_greater_than_ 40% of salary:
+    show_me_results("Rent is too high!")
+thats_if_ rent is_similar_to_ 30% of salary within_ 500.00 ZAR:
+    show_me_results("Rent is just right")
+since_then_:
+    show_me_results("Rent is affordable")
+
+shares = split 100.00 ZAR into 3
+show_me_results("R100 split three ways:", shares)
+show_me_results("VAT on a R999 phone:", vat_on_ 999.00 ZAR)
+
+savings = 20% of (salary - rent)
+because_is_ savings

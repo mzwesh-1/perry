@@ -1,0 +1,10 @@
+# Perry: add 10 cents ten times
+total = 0.00 ZAR
+exactly_ 10 times:
+    total = total + 0.10 ZAR
+show_me_results("Total:", total)
+show_me_results("Is it R1.00?", total is_equal_to_ 1.00 ZAR)
+
+flights = 12500.00 ZAR
+hotel   = 850.00 USD
+show_me_results("Trip:", flights + hotel)

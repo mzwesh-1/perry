@@ -1,3 +1,5 @@
 PERRY
 perry
 *.exe
+__pycache__/
+*.pyc

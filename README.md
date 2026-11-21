@@ -1,241 +1,256 @@
-# Perry
+<p align="center">
+  <img src="docs/images/perry-logo.png" alt="Perry logo" width="140">
+</p>
 
-Created by Mzwandile Zulu.
+<h1 align="center">Perry</h1>
 
-Perry is an English-style programming language for exact money and finance, written in plain C.
+<p align="center">
+  <b>A programming language for money that reads like English.</b><br>
+  Exact to the cent. Knows its currencies. Finds money mistakes before the program runs.
+</p>
 
-## Build and run (WSL / Linux)
+<p align="center">
+  <a href="https://mzwesh-1.github.io/perry/">Read the article</a> ·
+  <a href="docs/media/perry-demo.mp4">Watch the 3-minute demo</a> ·
+  <a href="docs/LANGUAGE.md">Language reference</a> ·
+  <a href="#quick-start">Quick start</a>
+</p>
 
-    make
-    ./PERRY test.perry
+<p align="center">
+  <img alt="Version 0.9.0" src="https://img.shields.io/badge/version-0.9.0-F2A93B">
+  <img alt="Written in C99" src="https://img.shields.io/badge/written%20in-C99-555">
+  <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-2b7">
+  <img alt="Made in South Africa" src="https://img.shields.io/badge/made%20in-South%20Africa-007749">
+</p>
 
-The command is called `PERRY`, in capital letters, so it never clashes with other
-programs called "perry". Install it so you can type `PERRY` anywhere (and VS Code
-can find it):
+---
 
-    sudo make install
+Most programming languages store money as binary floating-point numbers, which
+cannot represent everyday amounts such as 10 cents exactly, and they have no idea
+that rand and dollars are different things. Perry is built for money from the
+ground up. It was created in South Africa by **Mzwandile Zulu**.
 
-Other modes:
+```perry
+salary = 25000.00 ZAR
+rent   = 7800.00 ZAR
+never_changes_ VAT = 15%
 
-    ./PERRY --tokens test.perry    # what the lexer sees
-    ./PERRY --tree test.perry      # what the parser builds
-    ./PERRY --check test.perry     # look for mistakes without running
-    ./PERRY --version
+check_if_ rent is_greater_than_ 40% of salary:
+    show_me_results("Rent is too high!")
+thats_if_ rent is_similar_to_ 30% of salary within_ 500.00 ZAR:
+    show_me_results("Rent is just right")
+since_then_:
+    show_me_results("Rent is affordable")
 
-### Checking without running
+shares = split 100.00 ZAR into 3
+show_me_results("R100 split three ways:", shares)
+show_me_results("VAT on a R999 phone:", vat_on_ 999.00 ZAR)
 
-`./PERRY --check file.perry` finds money mistakes before the program runs, on every
-path - including `check_if_` branches and functions that a test run never reaches.
-It reports the same errors Perry would stop with: mixed currencies, money plus a
-plain number, a yearly rate where a monthly one is needed, part-year compounding,
-an exchange rate for the wrong currencies, a record field of the wrong type, mixed
-currencies in a list or a table loaded `as_ ZAR`, and names that don't exist yet.
+savings = 20% of (salary - rent)
+because_is_ savings
+```
 
-    define_ year_end(balance, is_december):
-        check_if_ is_december:
-            give_back_ balance + 250.00 USD
-        give_back_ balance
+```text
+Rent is just right
+R100 split three ways: [33.34 ZAR, 33.33 ZAR, 33.33 ZAR]
+VAT on a R999 phone: 149.85 ZAR
+savings is 3440.00 ZAR
+  because savings = 20% of (salary - rent)
+                  = 20% of (25000.00 ZAR - 7800.00 ZAR)
+  salary is 25000.00 ZAR (given)
+  rent is 7800.00 ZAR (given)
+```
 
-    show_me_results(year_end(10000.00 ZAR, no_))
+The three-way split always adds back up to exactly R100, and `because_is_` shows
+how every answer was worked out.
 
-Running this prints 10000.00 ZAR. `--check` reports line 3: can't add ZAR and USD.
+## Why Perry?
 
-It only reports what it is sure of: values from CSV files, `ask_user_` and modules
-are checked when the program runs. A mistake inside `try_this_` that an `even_if_`
-would catch is shown as a note. VS Code runs `--check` on every save, so these show
-as red underlines. `make test` runs the checker's tests in `tests/check/`.
+### 1. Exact money
 
-`make static` builds `PERRY-linux-x64`, a copy that runs on any 64-bit Linux or WSL
-with nothing else installed. This is the one packed inside the VS Code extension.
+Perry has no floating point. Every number is an exact decimal (up to 18 digits
+before the point and 12 after), and money is always rounded to its currency's
+decimal places: 2 for ZAR and USD, 0 for JPY, 3 for KWD.
 
-## What works (v0.9.0)
+| | Python | Perry |
+|---|---|---|
+| Add 10 cents ten times | `0.9999999999999999` | `1.00 ZAR` |
+| Is that equal to R1.00? | `False` | `yes` |
+| R12 500 + $850 | `13350.0`, no warning | stops: *can't add ZAR and USD - convert one currency first* |
 
-- Numbers, money (`199.99 ZAR`), percentages (`15%`), text, `yes_`, `no_`, `nothing_`
-- Exact maths: no floating point, so `0.1 + 0.2` is exactly `0.3`
-- Money rules: no mixing currencies, no adding plain numbers to money,
-  always rounded to the currency's decimal places (ZAR 2, JPY 0, KWD 3)
-- `x = ...` and `never_changes_ X = ...`
-- `+ - * /` and `15% of price`
-- `show_me_results(...)`
-- `check_if_` / `thats_if_` / `since_then_`, and one-line `if_then_ ... : ...`
-- `is_equal_to_`, `is_not_equal_to_`, `is_greater_than_`, `is_less_than_`,
-  `is_greater_equal_to_`, `is_less_equal_to_`
-- `is_similar_to_ ... within_ ...`, `is_really_not_close_to_ ... within_ ...`
-- `and_`, `or_`, `not_`
-- `exactly_ N times:`, `keep_going_while_ ...:`, `stop_now_`, `skip_this_one_`
-- `not_unless_ ...` (stops the program if a requirement isn't met)
+<p align="center">
+  <img src="docs/images/python-vs-perry.png" alt="The same program in Python and Perry, side by side in VS Code" width="560">
+</p>
 
-New in v0.3:
+Both programs are in [`examples/showcase`](examples/showcase).
 
-- Lists: `[1200.00 ZAR, 350.50 ZAR]`, `total_of_`, `count_of_`
-- `go_through_ list as_ item:` loops
-- `parts = split 100.00 ZAR into 3` gives `[33.34 ZAR, 33.33 ZAR, 33.33 ZAR]`,
-  which always adds back up to the original amount
-- Functions: `define_ name(a, b):` with `give_back_`. Functions can read names
-  from outside but can't change them.
-- `because_is_ name` explains how a value was calculated
+### 2. It knows currencies and rates
 
-New in v0.4:
+Amounts carry their currency (`199.99 ZAR`, `9.99 USD`), and interest rates carry
+their period (`11.75% per year`). Perry refuses sums that make no financial sense:
 
-- Rates with periods: `11.75% per year`, and `rate per month` converts it exactly
-  (Perry won't let you mix a yearly and a monthly rate by accident)
-- Loans: `monthly_payment(loan, rate per month, 240)` and
-  `schedule_of_(loan, rate per month, 240)` for the month-by-month table
-- Rounding: `round_to_ x 2 decimals`, with `the_bank_way_` (halves to even),
-  `up_` or `down_`
-- Tax tables: `tax_table_ name:` with `up_to_ ... taxed_at_ ...` lines and a final
-  `above_ taxed_at_ ...`, then `name on_ income`
-- Bank statements: `statement = go_get_ "statement.csv" as_ ZAR` loads a CSV file
-  (the path is relative to your .perry file). Column names become Perry names:
-  "Transaction Date" becomes `transaction_date`.
-- Tables: `row.amount` for one cell, `statement.amount` for a whole column,
-  `go_through_ statement as_ tx:`, `count_of_ statement`
-- Filters: `go_get_in_ statement by_ amount that_is_less_than_ 0.00 ZAR`,
-  `remove_where_ statement by_ amount that_is_equal_to_ 0.00 ZAR`
-- Sorting: `sort_ spending by_ amount highest_first_` (or `lowest_first_`)
+- adding rand to dollars without an exchange rate
+- adding a plain number to money
+- using a yearly rate where a monthly one is needed
+- converting with an exchange rate for the wrong currencies
 
-New in v0.5:
+To mix currencies, convert explicitly. The rate then shows up in `because_is_`:
 
-- Error handling:
+```perry
+netflix = convert_ 9.99 USD to_ ZAR at_rate_ 18.20 ZAR per USD
+```
 
-      try_this_:
-          statement = go_get_ "statement.csv" as_ ZAR
-      even_if_ theres_a_file_error_:
-          show_me_results("Couldn't read the file")
-      even_if_ theres_an_error_:
-          show_me_results("Something else went wrong")
-      but_then_:
-          show_me_results("This always runs")
+### 3. It finds mistakes before the program runs
 
-  Kinds of error: `theres_a_currency_error_` (mixing currencies or money with plain
-  numbers), `theres_a_file_error_` (go_get_ problems), `theres_a_balance_error_`
-  (a failed not_unless_), and `theres_an_error_` (anything).
-  `raise_alarm_ "message"` raises your own error.
-- Dates: `2026-12-31`, `today_`, `+ 30 days`, `+ 2 weeks`, `+ 1 month`, `+ 1 year`
-  (31 Jan + 1 month = 28 Feb), `+ 5 business days`, `date - date`,
-  `days_between_ a and_ b`, `business_days_between_ a and_ b`, `end_of_month_ d`
-- `steal_from_ holidays_za` makes business days skip South African public holidays
-  (fixed holidays, Good Friday, Family Day, and the Sunday -> Monday rule).
-  Once-off holidays such as election days are not included.
-- CSV cells like `2026-09-01` become dates, so you can filter and sort by date.
-- Loan lengths can be written as `20 years` or `240 months`.
+`PERRY --check` reads a program without running it and reports every money
+mistake it can prove, on **every** path, including `check_if_` branches and
+functions that a test run never reaches:
 
-New in v0.6:
+```perry
+define_ year_end(balance, is_december):
+    check_if_ is_december:
+        give_back_ balance + 250.00 USD
+    give_back_ balance
 
-- Bookkeeping:
+show_me_results(year_end(10000.00 ZAR, no_))
+```
 
-      book_ "Paid rent":
-          debit_  rent_expense  8000.00 ZAR
-          credit_ bank          8000.00 ZAR
+Running this prints `10000.00 ZAR`, because the December branch never runs.
+`--check` still finds the bug:
 
-  Every entry must balance (debits = credits) and use one currency, or it is
-  refused with a balance error and nothing is recorded. `balance_of_("bank")` is
-  the account's debits minus its credits; `journal_()` and `trial_balance_()`
-  give tables.
-- Saving: `save_to_ "report.csv" statement` writes a table, list or value as CSV.
-  Money is written as a plain number (8000.00) so spreadsheets can add it up;
-  read it back with `go_get_ "report.csv" as_ ZAR`. Empty cells load as nothing_,
-  and total_of_ skips them.
-- Exchange rates and conversion: `rate = 18.2034 ZAR per USD`, then
-  `convert_ price to_ USD at_rate_ rate on_ 2026-09-25`. The rate and date show up
-  in because_is_.
+```text
+year_end.perry:3: error: can't add ZAR and USD - convert one currency first
+```
 
-New in v0.7:
+In VS Code, the check runs every time you save, and mistakes are underlined in red:
 
-- Statistics: `average_of_`, `biggest_of_`, `smallest_of_` on lists and columns
-  (numbers, money, dates or text; blanks are skipped)
-- `group_by_ statement by_ category`: one row per category with a count and the
-  total of every number/money column. `group_by_ list` counts each value.
-- `add_where_ expenses 80.00 ZAR` adds to a list; for a table give one value per
-  column: `add_where_ statement [2026-09-30, "Coffee", "food", -35.00 ZAR]`
-- `erase_ name` removes a name and its value
-- VAT, using your own `VAT` rate (e.g. `never_changes_ VAT = 15%`):
-  `vat_on_ 1000.00 ZAR` gives 150.00 ZAR, `vat_inside_ 1150.00 ZAR` gives 150.00 ZAR
-- Interest: `simple_interest_`, `compound_interest_`, `future_value_`,
-  `present_value_`, each with (amount, rate with a period, length of time), e.g.
-  `future_value_(10000.00 ZAR, 10% per year, 5 years)`. Compounding happens once
-  per rate period, so for monthly compounding use `rate per month` and months.
+<p align="center">
+  <img src="docs/images/warning-on-save.png" alt="VS Code underlines a ZAR plus USD mistake on save" width="560">
+</p>
 
-New in v0.8:
+The checker only reports what it can prove. In our tests it raised **no false
+alarms** on correct programs (including 900 randomly generated ones), and
+it caught **98% of deliberately introduced money mistakes** before the programs
+were run. A study with programs written by university students is planned. See
+[`research/`](research) to reproduce every number.
 
-- Records with `blueprint_`:
+### 4. Finance is built in
 
-      blueprint_ Payment:
-          date:        date
-          description: text
-          amount:      money
+| Area | What you get |
+|---|---|
+| Everyday money | `split ... into`, `vat_on_`, `vat_inside_`, `round_to_ ... the_bank_way_`, tax tables |
+| Loans and interest | `monthly_payment`, `schedule_of_`, `compound_interest_`, `future_value_`, `present_value_` |
+| Investment appraisal | `npv_`, `irr_`, `payback_`, `discounted_payback_` |
+| Depreciation | `straight_line_`, `reducing_balance_`, `sum_of_years_` |
+| Annuities and bonds | `annuity_`, `annuity_due_`, `perpetuity_`, `bond_price_`, `bond_yield_` |
+| Statistics (exact fractions) | `average_of_`, `median_`, `variance_`, `standard_deviation_`, `correlation_`, `regression_` |
+| Actuarial | life tables, `life_expectancy_`, `life_annuity_`, `term_insurance_`, `endowment_` |
+| Data | CSV bank statements, filters, sorting, `group_by_`, `duplicate_where_`, `save_to_` |
+| Bookkeeping | `book_` entries that must balance, `balance_of_`, `trial_balance_()` |
+| Dates | `+ 5 business days` that skip South African public holidays, `end_of_month_` |
 
-      rent = Payment(2026-09-01, "Rent", -8500.00 ZAR)
-      show_me_results(rent.amount)
+The finance functions were checked against an independent 60-digit reference on
+more than 40 000 random cases, with 0 differences.
 
-  Field types: number, money, percent, text, date, yes_no, list, anything.
-  Values are checked when a record is made; `nothing_` is allowed for "not known yet".
-  `records.amount` gives that field from a list of records, and `add_where_` adds
-  a record to a table when its field names match the columns.
-- Modules: `steal_from_ budget_tools` loads budget_tools.perry (next to your file)
-  and runs it once. Inside it, `share_ with_vat, VAT` lists what others may take;
-  with no share_ line, everything is shared. `in_that_ budget_tools steal_from_
-  with_vat` takes just the names you list. Each module keeps its own names, taken
-  values never change, and errors point at the module's own file and line.
-- `duplicate_where_ statement by_ description` finds items that appear more than
-  once, such as a payment charged twice.
-- `ask_user_("Your salary?")` asks a question and reads the answer as money
-  (25000.00 ZAR), a number, percent, date, yes/no or text. In VS Code, programs
-  that ask questions run in the terminal automatically.
+## Build an app in 30 lines
 
-New in v0.8.2:
+[`examples/showcase/budget_app.perry`](examples/showcase/budget_app.perry) is a
+student budget planner that uses records (`blueprint_`), functions, user input,
+lists and a loan calculation:
 
-- `ask_user_("Salary?") as_ ZAR` reads amounts however they're typed (25000, R25 000,
-  25,000.50, 25 000,50, 25000zar) and asks again if the answer isn't an amount. Also
-  `as_ number`, `as_ percent`, `as_ date`, `as_ yes_no` and `as_ text`.
-  `ask_user_("Press Enter")` can stand on its own line.
-- `x not_ is_equal_to_ 5` works as well as `not_ x is_equal_to_ 5`.
-- `define_ hello:` needs no brackets when there are no inputs.
-- Clearer messages for a function used without give_back_, `return`, `print`, a missing
-  bracket (`tax 100.00 ZAR`), names with different capitals, and words like
-  `is_not_greater_than_`.
+```perry
+blueprint_ Expense:
+    name:   text
+    amount: money
 
-New in v0.8.3:
+income = ask_user_("What is your monthly income?") as_ ZAR
 
-- The command is now `PERRY` (was `perry`). After `sudo make install` you can remove
-  the old one with `sudo rm /usr/local/bin/perry`.
-- `make static` for a stand-alone Linux/WSL build.
+expenses = [Expense("Rent", 4500.00 ZAR)]
+add_where_ expenses Expense("Food", 2200.00 ZAR)
+add_where_ expenses Expense("Transport", 950.00 ZAR)
 
-New in v0.9.0 (Perry for Universities):
+spent = total_of_ expenses.amount
+show_me_results("Spent:", spent, "Left:", income - spent)
 
-- 12 decimal places (was 6) and numbers with up to 18 digits before the decimal point,
-  stored in 128-bit integers. Still no floating point.
-- Engineering economics: `npv_(rate, flows)` (first flow is today), `irr_(flows)`,
-  `payback_(flows)`, `discounted_payback_(rate, flows)`.
-- Depreciation schedules: `straight_line_`, `reducing_balance_`, `sum_of_years_`.
-- Annuities: `annuity_`, `annuity_due_`, `deferred_annuity_`, `accumulated_annuity_`,
-  `perpetuity_`; bonds: `bond_price_`, `bond_yield_`.
-- Statistics, worked out as exact fractions: `variance_`, `standard_deviation_`,
-  `population_variance_`, `population_standard_deviation_`, `median_`, `percentile_`,
-  `correlation_`, `regression_` (a row with slope, intercept, r_squared, correlation, count).
-- Life tables from CSV (`age` with `qx` or `lx`): `survival_`, `life_expectancy_`,
-  `life_annuity_`, `temporary_life_annuity_`, `life_insurance_`, `term_insurance_`,
-  `pure_endowment_`, `endowment_`. `examples/life_table.csv` is an illustrative table.
-- `power_(x, n)` and `square_root_(x)`, exact to 12 decimals.
-- All of it was checked against an independent 60-digit reference on more than 40 000
-  random cases, with 0 differences.
+laptop = monthly_payment(15000.00 ZAR, 11.75% per year per month, 24 months)
+show_me_results("A laptop on credit costs", laptop, "a month")
+```
 
-Examples: `examples/records.perry` (with `examples/budget_tools.perry`), `examples/ask.perry`, `examples/analysis.perry`, `examples/interest.perry`, `examples/books.perry`, `examples/currency.perry`, `examples/dates.perry`, `examples/safe_statement.perry`, `examples/loan.perry`, `examples/statement.perry`, `examples/tax.perry`,
-`examples/rounding.perry`.
+Add a Netflix bill in dollars, and Perry flags it on save before the app ever runs:
 
-Limits: numbers with up to 18 digits before the decimal point and up to 12 decimal places. In CSV files,
-amounts must be plain numbers like `-1250.50`; values like `1,250.50` stay as text.
+<p align="center">
+  <img src="docs/images/budget-error-caught.png" alt="Perry flags a dollar amount added to a rand budget" width="700">
+</p>
 
-## Files
+## Quick start
 
-- `src/tokens.h`  - every token and keyword (add new keywords here)
-- `src/lexer.c`   - reads the source and produces tokens
-- `src/parser.c`  - turns tokens into a syntax tree
-- `src/interp.c`  - runs the tree; Perry's money rules live here
-- `src/value.c`   - exact decimal arithmetic and printing
-- `src/errors.c`  - error messages with the line of code
-- `src/csv.c`     - reads CSV files into tables
-- `src/dates.c`   - calendar maths and public holidays
-- `src/finance.c` - NPV, IRR, depreciation, annuities, bonds, statistics, life tables
-- `src/main.c`    - the `PERRY` command
-- `examples/`     - error demos, and `tour.perry` (uses features not built yet)
+Perry is written in plain C99 with no dependencies.
+
+**Linux, macOS or Windows (WSL):**
+
+```sh
+git clone https://github.com/mzwesh-1/perry.git
+cd perry
+make
+./PERRY examples/showcase/english.perry
+sudo make install          # optional: lets you type PERRY anywhere
+```
+
+**Windows (without WSL):** install a C compiler such as MinGW-w64, then run
+`build.bat`.
+
+Ready-built programs for Linux, Windows and macOS are made on every push: open
+the [Actions tab](../../actions), choose the latest run, and download them under
+*Artifacts*.
+
+Other commands:
+
+```sh
+PERRY program.perry            # run a program
+PERRY --check program.perry    # find money mistakes without running
+PERRY --tokens program.perry   # what the lexer sees
+PERRY --tree program.perry     # what the parser builds
+PERRY --version
+make test                      # run the checker's tests
+```
+
+## Keywords at a glance
+
+Perry's keywords end with an underscore, so they never clash with your own names.
+
+| Perry | Meaning |
+|---|---|
+| `check_if_` / `thats_if_` / `since_then_` | if / else if / else |
+| `is_greater_than_`, `is_less_than_`, `is_equal_to_` | comparisons |
+| `is_similar_to_ ... within_ ...` | close enough, within a tolerance |
+| `exactly_ 10 times:`, `keep_going_while_`, `go_through_ list as_ item:` | loops |
+| `define_ name(a, b):` ... `give_back_` | functions |
+| `blueprint_ Payment:` | records with typed fields |
+| `never_changes_ VAT = 15%` | a constant |
+| `not_unless_ ...` | stop if a requirement isn't met |
+| `try_this_:` ... `even_if_ theres_a_currency_error_:` | error handling |
+| `steal_from_ budget_tools` | use another Perry file |
+| `because_is_ name` | explain how a value was calculated |
+
+The full list, with examples, is in the [language reference](docs/LANGUAGE.md).
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `src/` | the interpreter (lexer, parser, exact decimal arithmetic, finance library) and the `--check` static checker |
+| `examples/` | example programs; `examples/showcase/` has the programs from the demo video |
+| `tests/check/` | tests for the checker (`make test`) |
+| `research/` | scripts that reproduce every evaluation number, and the student bug-study kit |
+| `docs/` | the [article](https://mzwesh-1.github.io/perry/), the language reference, figures and the demo video |
+
+## Status
+
+Perry 0.9.0 is a working interpreter and checker, used for teaching finance and
+programming. The language is still young: expect new features and occasional
+changes. Bug reports and ideas are welcome in [Issues](../../issues).
+
+## Licence
+
+Perry is free and open source under the [MIT licence](LICENSE).
+Copyright © 2026 Mzwandile Zulu.

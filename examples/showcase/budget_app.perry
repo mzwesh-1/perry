@@ -1,0 +1,30 @@
+# Student Budget Planner
+blueprint_ Expense:
+    name:   text
+    amount: money
+
+define_ verdict(money_left):
+    check_if_ money_left is_less_than_ 0.00 ZAR:
+        give_back_ "Over budget - time to cut back!"
+    thats_if_ money_left is_less_than_ 1000.00 ZAR:
+        give_back_ "Tight, but you will make it"
+    give_back_ "Nice! Put the rest into savings"
+
+income = ask_user_("What is your monthly income?") as_ ZAR
+
+expenses = [Expense("Rent", 4500.00 ZAR)]
+add_where_ expenses Expense("Food", 2200.00 ZAR)
+add_where_ expenses Expense("Transport", 950.00 ZAR)
+add_where_ expenses Expense("Data", 399.00 ZAR)
+
+go_through_ expenses as_ e:
+    show_me_results(e.name, e.amount)
+
+spent = total_of_ expenses.amount
+left  = income - spent
+show_me_results("Spent:", spent, "Left:", left)
+show_me_results(verdict(left))
+show_me_results("Biggest cost:", biggest_of_ expenses.amount)
+
+laptop = monthly_payment(15000.00 ZAR, 11.75% per year per month, 24 months)
+show_me_results("A laptop on credit costs", laptop, "a month")
