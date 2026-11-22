@@ -13,6 +13,7 @@
   <a href="https://mzwesh-1.github.io/perry/">Read the article</a> ·
   <a href="docs/media/perry-demo.mp4">Watch the 3-minute demo</a> ·
   <a href="docs/LANGUAGE.md">Language reference</a> ·
+  <a href="docs/press">Press kit</a> ·
   <a href="#quick-start">Quick start</a>
 </p>
 
@@ -242,7 +243,7 @@ The full list, with examples, is in the [language reference](docs/LANGUAGE.md).
 | `examples/` | example programs; `examples/showcase/` has the programs from the demo video |
 | `tests/check/` | tests for the checker (`make test`) |
 | `research/` | scripts that reproduce every evaluation number, and the student bug-study kit |
-| `docs/` | the [article](https://mzwesh-1.github.io/perry/), the language reference, figures and the demo video |
+| `docs/` | the [article](https://mzwesh-1.github.io/perry/), the language reference, figures, the demo video and the [press kit](docs/press) |
 
 ## Status
 
